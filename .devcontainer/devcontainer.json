@@ -13,7 +13,8 @@
                 "ms-azuretools.vscode-docker"
             ]
         }
-    }
+    },
+    "postStartCommand": "gosu root service ssh start && /usr/local/hadoop-3.4.1/sbin/start-dfs.sh",
     // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
     // Features to add to the dev container. More info: https://containers.dev/features.
     // "features": {},
@@ -24,5 +25,5 @@
     // Configure tool-specific properties.
     // "customizations": {},
     // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-    // "remoteUser": "root"
+    "remoteUser": "hadoop"
 }

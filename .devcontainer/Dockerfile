@@ -1,43 +1,59 @@
+# syntax=docker/dockerfile:1
+
+################################################################################
+# Recipe Begin
 FROM ubuntu:latest
 
-# 更新系统
+# Upgrade Ubuntu
 RUN sed -i "s@http://.*archive.ubuntu.com@http://mirrors.huaweicloud.com@g" /etc/apt/sources.list.d/ubuntu.sources \
     && sed -i "s@http://.*security.ubuntu.com@http://mirrors.huaweicloud.com@g" /etc/apt/sources.list.d/ubuntu.sources
 RUN apt update -y && apt upgrade -y
-RUN apt install -y sudo
 
-# 创建用户
-RUN useradd -G sudo -m -s /bin/bash hadoop
+# Create user for convenience
+RUN groupadd -r hadoop && useradd --no-log-init -r -g hadoop hadoop
 RUN echo 'hadoop:hadoop' | chpasswd hadoop
 
-# 安装依赖项
-RUN apt install -y openjdk-8-jdk openssh-server openssh-client wget
+# Install `gosu` to replace `sudo`.
+# See https://github.com/tianon/gosu
+RUN set -eux && apt update && apt install -y gosu && rm -rf /var/lib/apt/lists/* \
+    # verify that the binary works
+    && gosu hadoop:hadoop /bin/bash -c 'whoami && id'
+
+# Install dependencies
+RUN apt install -y openjdk-8-jdk openssh-server openssh-client
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/
 
-# 安装 Hadoop
+# Install Apache Hadoop v3.4.1
 WORKDIR /usr/local
-RUN wget --verbose 'https://dlcdn.apache.org/hadoop/common/hadoop-3.4.1/hadoop-3.4.1.tar.gz' \
-    && tar -zxvf 'hadoop-3.4.1.tar.gz' \
-    && rm -v 'hadoop-3.4.1.tar.gz' \
-    && chown -Rvf hadoop:hadoop hadoop-3.4.1
+ADD --chown=hadoop:hadoop 'https://dlcdn.apache.org/hadoop/common/hadoop-3.4.1/hadoop-3.4.1.tar.gz' /usr/local/
 WORKDIR /usr/local/hadoop-3.4.1
-RUN ["bin/hadoop", "version"]
 
-# 安装 OpenSSH Server
-USER hadoop
+# Install OpenSSH Server
+USER hadoop:hadoop
 RUN mkdir -pv ~hadoop/.ssh/ \
     && ssh-keygen -t ed25519 -P '' -f ~hadoop/.ssh/id_ed25519 \
     && cat ~hadoop/.ssh/id_ed25519.pub > ~hadoop/.ssh/authorized_keys \
     && chmod -v 0600 ~hadoop/.ssh/authorized_keys
 
-# 切换 Hadoop 为单节点为分布式
+# Switch Apache Hadoop into pseudo-distributed mode
 RUN rm -v /usr/local/hadoop-3.4.1/etc/hadoop/core-site.xml \
     && rm -v /usr/local/hadoop-3.4.1/etc/hadoop/hdfs-site.xml
 COPY configs/*.xml /usr/local/hadoop-3.4.1/etc/hadoop/
 RUN bin/hdfs namenode -format
 
-# 暴露必要端口
 EXPOSE 9000 9864 9866-9868 9870
 
-# 容器保活
 CMD [ "/bin/bash" ]
+# Recipe End
+################################################################################
+
+################################################################################
+# Addtional information begin
+LABEL author="Dragon1573"
+LABEL name="hadoop-in-docker"
+LABEL version="3.4.1"
+LABEL hadoop_mode="pseudo_distributed"
+LABEL license="MIT"
+LABEL repo_url="https://github.com/Dragon1573/Hadoop-in-Docker.git"
+# Addtional information End
+################################################################################
